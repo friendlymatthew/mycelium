@@ -1,0 +1,21 @@
+# rust
+/target
+
+# python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# # data
+# data/
+# example.fit
+# example.json
+
+# garmin tokens
+.garminconnect/
+
+# environment
+.env

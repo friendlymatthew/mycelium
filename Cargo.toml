@@ -1,0 +1,8 @@
+[workspace]
+members = ["renderer", "storage"]
+default-members = ["renderer"]
+resolver = "2"
+
+[workspace.dependencies]
+anyhow = "1.0"
+tokio = { version = "1.0", features = ["full"] }
