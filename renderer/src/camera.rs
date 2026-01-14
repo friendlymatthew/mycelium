@@ -123,7 +123,7 @@ impl Camera {
         let distance = direction.length();
 
         // todo: probably make these into constants
-        let min_distance = 0.1;
+        let min_distance = 0.01;
         let max_distance = 100.0;
 
         let new_distance = (distance * (1.0 - factor)).clamp(min_distance, max_distance);

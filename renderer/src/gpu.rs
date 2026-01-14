@@ -1,9 +1,14 @@
-use std::sync::Arc;
-
 use crate::{Camera, GpsVertex};
 use anyhow::{anyhow, Result};
 use wgpu::util::DeviceExt;
+
+#[cfg(feature = "winit")]
+use std::sync::Arc;
+#[cfg(feature = "winit")]
 use winit::window::Window;
+
+#[cfg(target_arch = "wasm32")]
+use web_sys::HtmlCanvasElement;
 
 pub struct GpsRenderer {
     surface: wgpu::Surface<'static>,
@@ -21,9 +26,27 @@ pub struct GpsRenderer {
     axis_buffer: wgpu::Buffer,
     depth_texture: wgpu::Texture,
     depth_view: wgpu::TextureView,
+    msaa_texture: wgpu::Texture,
+    msaa_view: wgpu::TextureView,
 }
 
 impl GpsRenderer {
+    #[cfg(target_arch = "wasm32")]
+    pub async fn new_wasm(canvas: &HtmlCanvasElement) -> Result<Self> {
+        let width = canvas.width();
+        let height = canvas.height();
+
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::BROWSER_WEBGPU | wgpu::Backends::GL,
+            ..Default::default()
+        });
+
+        let surface = instance.create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))?;
+
+        Self::init_renderer(surface, instance, width, height).await
+    }
+
+    #[cfg(feature = "winit")]
     pub async fn new(window: Arc<Window>) -> Result<Self> {
         // holy ceremony
 
@@ -35,6 +58,16 @@ impl GpsRenderer {
         });
 
         let surface = instance.create_surface(window.clone())?;
+
+        Self::init_renderer(surface, instance, size.width, size.height).await
+    }
+
+    async fn init_renderer(
+        surface: wgpu::Surface<'static>,
+        instance: wgpu::Instance,
+        width: u32,
+        height: u32,
+    ) -> Result<Self> {
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -55,7 +88,8 @@ impl GpsRenderer {
                 },
                 None,
             )
-            .await?;
+            .await
+            .map_err(|e| anyhow!("Failed to request device: {:?}", e))?;
 
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps
@@ -68,8 +102,8 @@ impl GpsRenderer {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
-            width: size.width,
-            height: size.height,
+            width,
+            height,
             present_mode: surface_caps.present_modes[0],
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
@@ -77,7 +111,7 @@ impl GpsRenderer {
         };
         surface.configure(&device, &config);
 
-        let camera = Camera::new(size.width as f32 / size.height as f32);
+        let camera = Camera::new(width as f32 / height as f32);
 
         let camera_uniform = camera.build_view_projection_matrix();
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -125,12 +159,12 @@ impl GpsRenderer {
         let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("depth_texture"),
             size: wgpu::Extent3d {
-                width: size.width,
-                height: size.height,
+                width,
+                height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
-            sample_count: 1,
+            sample_count: 4,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Depth32Float,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
@@ -138,6 +172,23 @@ impl GpsRenderer {
         });
 
         let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let msaa_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("msaa_texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 4,
+            dimension: wgpu::TextureDimension::D2,
+            format: config.format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+
+        let msaa_view = msaa_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         // create axis vertices (x=red, y=green, z=blue)
         let axis_length = 2.0f32;
@@ -210,7 +261,7 @@ impl GpsRenderer {
                 bias: wgpu::DepthBiasState::default(),
             }),
             multisample: wgpu::MultisampleState {
-                count: 1,
+                count: 4,
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
@@ -255,7 +306,7 @@ impl GpsRenderer {
                 bias: wgpu::DepthBiasState::default(),
             }),
             multisample: wgpu::MultisampleState {
-                count: 1,
+                count: 4,
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
@@ -279,10 +330,12 @@ impl GpsRenderer {
             axis_buffer,
             depth_texture,
             depth_view,
+            msaa_texture,
+            msaa_view,
         })
     }
 
-    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+    pub fn resize(&mut self, new_size: wgpu::Extent3d) {
         if new_size.width > 0 && new_size.height > 0 {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
@@ -290,13 +343,9 @@ impl GpsRenderer {
 
             self.depth_texture = self.device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("depth_texture"),
-                size: wgpu::Extent3d {
-                    width: new_size.width,
-                    height: new_size.height,
-                    depth_or_array_layers: 1,
-                },
+                size: new_size,
                 mip_level_count: 1,
-                sample_count: 1,
+                sample_count: 4,
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Depth32Float,
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT
@@ -305,6 +354,20 @@ impl GpsRenderer {
             });
             self.depth_view = self
                 .depth_texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
+
+            self.msaa_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("msaa_texture"),
+                size: new_size,
+                mip_level_count: 1,
+                sample_count: 4,
+                dimension: wgpu::TextureDimension::D2,
+                format: self.config.format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            });
+            self.msaa_view = self
+                .msaa_texture
                 .create_view(&wgpu::TextureViewDescriptor::default());
 
             self.camera
@@ -406,13 +469,13 @@ impl GpsRenderer {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
+                    view: &self.msaa_view,
+                    resolve_target: Some(&view),
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.02,
-                            g: 0.02,
-                            b: 0.02,
+                            r: 1.0,
+                            g: 1.0,
+                            b: 1.0,
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,
@@ -441,13 +504,17 @@ impl GpsRenderer {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
 
-            // Single draw call for all activities using primitive restart
+            // Draw lines multiple times for thickness (simulate thicker lines)
             if let (Some(ref vertex_buffer), Some(ref index_buffer)) =
                 (&self.vertex_buffer, &self.index_buffer)
             {
                 render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
                 render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+
+                // Draw 3 times for thicker appearance
+                for _ in 0..3 {
+                    render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+                }
             }
         }
 

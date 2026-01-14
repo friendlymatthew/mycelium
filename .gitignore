@@ -1,7 +1,18 @@
-# rust
+# Rust
 /target
+Cargo.lock
+**/*.rs.bk
+*.pdb
 
-# python
+# WASM build output
+renderer/pkg/
+
+# Node.js / Web
+node_modules/
+web/node_modules/
+web/dist/
+
+# Python
 .venv/
 __pycache__/
 *.pyc
@@ -9,13 +20,29 @@ __pycache__/
 *.pyd
 .Python
 
-# # data
-# data/
-# example.fit
-# example.json
+# Data files (large files - optional)
+data/gps_data.parquet
+web/public/gps-data.json
 
-# garmin tokens
+# Garmin tokens
 .garminconnect/
 
-# environment
+# Environment
 .env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

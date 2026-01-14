@@ -1,5 +1,8 @@
+#[cfg(feature = "desktop")]
 use renderer::{GpsRenderer, GpsVertex};
+#[cfg(feature = "desktop")]
 use std::sync::Arc;
+#[cfg(feature = "desktop")]
 use winit::{
     application::ApplicationHandler,
     event::*,
@@ -7,6 +10,8 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowAttributes, WindowId},
 };
+
+#[cfg(feature = "desktop")]
 
 struct App {
     window: Option<Arc<Window>>,
@@ -80,7 +85,11 @@ impl ApplicationHandler for App {
             }
             WindowEvent::Resized(physical_size) => {
                 if let Some(renderer) = &mut self.renderer {
-                    renderer.resize(physical_size);
+                    renderer.resize(wgpu::Extent3d {
+                        width: physical_size.width,
+                        height: physical_size.height,
+                        depth_or_array_layers: 1,
+                    });
                 }
             }
             WindowEvent::RedrawRequested => {
@@ -90,7 +99,12 @@ impl ApplicationHandler for App {
                         Ok(_) => {}
                         Err(wgpu::SurfaceError::Lost) => {
                             if let Some(window) = &self.window {
-                                renderer.resize(window.inner_size())
+                                let size = window.inner_size();
+                                renderer.resize(wgpu::Extent3d {
+                                    width: size.width,
+                                    height: size.height,
+                                    depth_or_array_layers: 1,
+                                });
                             }
                         }
                         Err(wgpu::SurfaceError::OutOfMemory) => event_loop.exit(),
@@ -279,6 +293,7 @@ impl ApplicationHandler for App {
     }
 }
 
+#[cfg(feature = "desktop")]
 fn main() -> anyhow::Result<()> {
     env_logger::init();
 
@@ -310,6 +325,13 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(not(feature = "desktop"))]
+fn main() {
+    eprintln!("This binary requires the 'desktop' feature to be enabled.");
+    eprintln!("For WASM builds, use the web interface instead.");
+}
+
+#[cfg(feature = "desktop")]
 async fn load_activities() -> Vec<Vec<GpsVertex>> {
     // Load data from parquet file
     let parquet_path = "data/gps_data.parquet";
