@@ -147,7 +147,7 @@ impl ApplicationHandler for App {
                         let camera = renderer.camera_mut();
 
                         if self.left_dragging {
-                            let sensitivity = 0.005;
+                            let sensitivity = 0.002;
                             camera.orbit(dx * sensitivity, -dy * sensitivity);
                         }
 
@@ -204,7 +204,7 @@ impl ApplicationHandler for App {
                 }
                 KeyCode::KeyW => {
                     if let Some(renderer) = &mut self.renderer {
-                        renderer.camera_mut().fly_forward(0.1);
+                        renderer.camera_mut().fly_forward(0.02);
                         if let Some(window) = &self.window {
                             window.request_redraw();
                         }
@@ -212,7 +212,7 @@ impl ApplicationHandler for App {
                 }
                 KeyCode::KeyS => {
                     if let Some(renderer) = &mut self.renderer {
-                        renderer.camera_mut().fly_forward(-0.1);
+                        renderer.camera_mut().fly_forward(-0.02);
                         if let Some(window) = &self.window {
                             window.request_redraw();
                         }
@@ -220,7 +220,7 @@ impl ApplicationHandler for App {
                 }
                 KeyCode::KeyA => {
                     if let Some(renderer) = &mut self.renderer {
-                        renderer.camera_mut().fly_right(-0.1);
+                        renderer.camera_mut().fly_right(-0.02);
                         if let Some(window) = &self.window {
                             window.request_redraw();
                         }
@@ -228,7 +228,7 @@ impl ApplicationHandler for App {
                 }
                 KeyCode::KeyD => {
                     if let Some(renderer) = &mut self.renderer {
-                        renderer.camera_mut().fly_right(0.1);
+                        renderer.camera_mut().fly_right(0.02);
                         if let Some(window) = &self.window {
                             window.request_redraw();
                         }

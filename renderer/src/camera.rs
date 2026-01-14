@@ -23,7 +23,7 @@ impl Camera {
             up: [0.0, 1.0, 0.0],
             fovy: std::f32::consts::PI / 4.0,
             aspect,
-            znear: 0.1,
+            znear: 0.01,
             zfar: 1000.0,
             zoom: 1.0,
         }
@@ -36,7 +36,7 @@ impl Camera {
             up: [0.0, 1.0, 0.0],
             fovy: std::f32::consts::PI / 4.0,
             aspect,
-            znear: 0.1,
+            znear: 0.01,
             zfar: 1000.0,
             zoom: 1.0,
         }
@@ -68,7 +68,7 @@ impl Camera {
             up: [0.0, 1.0, 0.0],
             fovy: std::f32::consts::PI / 4.0,
             aspect,
-            znear: 0.1,
+            znear: 0.01,
             zfar: distance * 3.0,
             zoom: 1.0,
         }
